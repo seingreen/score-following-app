@@ -5,6 +5,7 @@ from typing import Optional
 
 import mido
 import partitura
+from midi2audio import FluidSynth
 import pyaudio
 from matchmaker import Matchmaker
 from partitura.score import Part
@@ -26,6 +27,7 @@ def preprocess_score(score_xml: Path) -> None:
     ----------
     score_xml : Path
         Path to the score xml file
+    여기서 partitura soundfont 바꾸기
     """
     score_obj = partitura.load_musicxml(score_xml)
 
@@ -33,8 +35,10 @@ def preprocess_score(score_xml: Path) -> None:
     partitura.save_score_midi(score_obj, score_midi_path)
 
     score_audio_path = f"./uploads/{score_xml.stem}.wav"
-    partitura.save_wav_fluidsynth(score_obj, score_audio_path)
+    soundfont_path = "/Users/maclab/workspace/score-following-app/aaviolin.sf2"
 
+    fs = FluidSynth(soundfont_path)
+    fs.midi_to_audio(score_midi_path, score_audio_path)
 
 def find_score_file_by_id(file_id: str, directory: Path = Path("./uploads")) -> Path:
     for file in directory.iterdir():
@@ -110,6 +114,9 @@ def get_midi_devices() -> list[dict]:
 
 def run_score_following(file_id: str, input_type: str, device: str) -> None:
     score_midi = find_score_file_by_id(file_id)  # .mid
+    if score_midi is None:
+        print(f"Error: MIDI file for file_id '{file_id}' not found.")
+        return
     score_part = partitura.load_score_as_part(score_midi)
     print(f"Running score following with {score_midi}")
 
@@ -144,7 +151,27 @@ def run_score_following(file_id: str, input_type: str, device: str) -> None:
                 quarter_position = convert_beat_to_quarter(score_part, current_position)
                 position_manager.set_position(file_id, quarter_position)
             alignment_in_progress = False
+
     except Exception as e:
         logging.error(f"Error: {e}")
         traceback.print_exc()
         return {"error": str(e)}
+
+# Commented out load_annotations function
+"""
+def load_annotations() -> list:
+    # 주석 파일 경로 설정
+    annotation_path = Path("../resources/schumann_annotation.txt")
+    annotations = []
+    with open(annotation_path, "r") as f:
+        for line in f:
+            onset, offset, measure_num = map(float, line.split())
+            annotations.append((onset, offset, measure_num))
+    return annotations
+"""
+"""
+바이올린에서 3번째 비트를 연주하면
+frame_positions[2]와 frame_positions[3]을 찾아서
+[3, frame_positions[2], frame_positions[3]] 형태로 전송
+/Users/maclab/workspace/score-following-app/backend/app/utils.py
+"""
